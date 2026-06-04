@@ -242,6 +242,67 @@ def render_capital_manager(client, capital_df: pd.DataFrame, refresh_token: int)
 
 def render_loan_manager(client, loan_df: pd.DataFrame, refresh_token: int) -> None:
     st.subheader("Editar préstamos")
+
+    # Pago aplicado a un préstamo existente: reduce total prestado y, por diferencia,
+    # aumenta el saldo disponible en el dashboard.
+    if not loan_df.empty:
+        st.markdown("#### Registrar pago")
+        payment_source = loan_df.copy()
+        payment_source["borrower_name"] = payment_source["borrower_name"].fillna("Total agregado")
+        payment_source["loan_date"] = pd.to_datetime(payment_source["loan_date"], errors="coerce").dt.date
+        payment_source["amount"] = pd.to_numeric(payment_source["amount"], errors="coerce").fillna(0.0)
+        payment_source = payment_source[payment_source["amount"] > 0]
+
+        if payment_source.empty:
+            st.info("No hay préstamos con saldo pendiente para aplicar pagos.")
+        else:
+            option_map = {
+                row["id"]: f"{row['borrower_name']} | Saldo: ${row['amount']:,.2f} | Fecha: {row['loan_date']}"
+                for _, row in payment_source.iterrows()
+            }
+            pay_col1, pay_col2, pay_col3 = st.columns([2, 1, 1])
+            with pay_col1:
+                selected_loan_id = st.selectbox(
+                    "Préstamo",
+                    options=list(option_map.keys()),
+                    format_func=lambda loan_id: option_map[loan_id],
+                    key=f"payment_loan_{refresh_token}",
+                )
+            with pay_col2:
+                payment_amount = st.number_input(
+                    "Monto de pago",
+                    min_value=0.01,
+                    step=1000.0,
+                    format="%.2f",
+                    key=f"payment_amount_{refresh_token}",
+                )
+            with pay_col3:
+                apply_payment = st.button("Aplicar pago", type="secondary")
+
+            if apply_payment:
+                selected_row = payment_source.loc[payment_source["id"] == selected_loan_id].iloc[0]
+                current_amount = float(selected_row["amount"])
+                if payment_amount > current_amount:
+                    st.error("El pago no puede ser mayor al saldo pendiente del préstamo.")
+                else:
+                    new_amount = round(current_amount - float(payment_amount), 2)
+                    existing_note = selected_row.get("note") or ""
+                    payment_note = f"Pago aplicado: ${float(payment_amount):,.2f} ({date.today().isoformat()})"
+                    merged_note = f"{existing_note} | {payment_note}".strip(" |")
+                    update_row(
+                        client,
+                        "loan_entries",
+                        selected_loan_id,
+                        {
+                            "amount": new_amount,
+                            "note": merged_note,
+                        },
+                    )
+                    st.success("Pago aplicado correctamente.")
+                    st.rerun()
+
+        st.markdown("---")
+
     editable = editable_loan_frame(loan_df)
     if editable.empty:
         st.info("No hay préstamos para editar.")
