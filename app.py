@@ -82,8 +82,9 @@ def add_css() -> None:
     st.markdown(CSS, unsafe_allow_html=True)
 
 
-@st.cache_data(show_spinner=False)
 def cached_fetch(table_name: str, order_by: str, refresh_token: int, client_url: str) -> pd.DataFrame:
+    _ = refresh_token
+    _ = client_url
     settings = load_supabase_settings()
     client = get_client(settings)
     if client is None:
