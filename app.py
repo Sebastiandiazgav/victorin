@@ -106,13 +106,7 @@ def render_metric(label: str, value: str, delta: str | None = None) -> None:
 
 def sidebar_config() -> None:
     st.sidebar.markdown("### Victorín")
-    st.sidebar.caption("Gestión de préstamos con persistencia en Supabase")
-    settings = load_supabase_settings()
-    if settings.is_configured:
-        st.sidebar.success("Supabase conectado desde variables de entorno o secrets")
-    else:
-        st.sidebar.warning("Faltan SUPABASE_URL y SUPABASE_ANON_KEY")
-        st.sidebar.info("Agrega esas variables en Streamlit Cloud o en un .env local.")
+    st.sidebar.caption("Gestión de préstamos, capital e ingresos")
     st.sidebar.markdown("---")
     st.sidebar.write("Categorías de ingreso")
     st.sidebar.write("- Capital inicial")
@@ -307,7 +301,7 @@ def main() -> None:
         """
         <div class="hero-card">
             <h1>Victorín</h1>
-            <p>Gestión de préstamos, capital e ingresos con persistencia en Supabase.</p>
+            <p>Gestión de préstamos, capital e ingresos</p>
         </div>
         """,
         unsafe_allow_html=True,
