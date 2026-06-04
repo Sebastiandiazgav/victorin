@@ -343,17 +343,84 @@ def render_loan_manager(client, loan_df: pd.DataFrame, refresh_token: int) -> No
             st.rerun()
 
 
-def render_export(capital_df: pd.DataFrame, loan_df: pd.DataFrame) -> None:
+def render_export(capital_df: pd.DataFrame, loan_df: pd.DataFrame, metrics: dict[str, float]) -> None:
     st.subheader("Exportar información")
     export_df = build_export_dataframe(capital_df, loan_df)
     csv_data = export_df.to_csv(index=False).encode("utf-8")
-    st.download_button(
-        label="Descargar registros en CSV",
-        data=csv_data,
-        file_name="victorin_registros.csv",
-        mime="text/csv",
-        use_container_width=True,
+
+    summary_df = pd.DataFrame(
+        [
+            {"Métrica": "Capital total", "Valor": float(metrics["capital_total"])},
+            {"Métrica": "Total prestado", "Valor": float(metrics["loans_total"])},
+            {"Métrica": "Saldo disponible", "Valor": float(metrics["available_balance"])},
+            {"Métrica": "Capital inicial", "Valor": float(metrics["initial_total"])},
+            {"Métrica": "Ingreso 15", "Valor": float(metrics["income_15_total"])},
+            {"Métrica": "Ingreso 30", "Valor": float(metrics["income_30_total"])},
+        ]
     )
+
+    excel_buffer = io.BytesIO()
+    with pd.ExcelWriter(excel_buffer, engine="xlsxwriter") as writer:
+        summary_df.to_excel(writer, sheet_name="Resumen", index=False)
+        export_df.to_excel(writer, sheet_name="Movimientos", index=False)
+
+        workbook = writer.book
+        header_format = workbook.add_format(
+            {
+                "bold": True,
+                "font_color": "#FFFFFF",
+                "bg_color": "#0F766E",
+                "align": "center",
+                "valign": "vcenter",
+                "border": 1,
+            }
+        )
+        money_format = workbook.add_format({"num_format": "$#,##0.00"})
+
+        summary_sheet = writer.sheets["Resumen"]
+        moves_sheet = writer.sheets["Movimientos"]
+
+        for col, column_name in enumerate(summary_df.columns):
+            summary_sheet.write(0, col, column_name, header_format)
+        for col, column_name in enumerate(export_df.columns):
+            moves_sheet.write(0, col, column_name, header_format)
+
+        summary_sheet.set_column("A:A", 28)
+        summary_sheet.set_column("B:B", 18, money_format)
+        summary_sheet.freeze_panes(1, 0)
+        summary_sheet.autofilter(0, 0, max(len(summary_df), 1), len(summary_df.columns) - 1)
+
+        moves_sheet.set_column("A:A", 14)
+        moves_sheet.set_column("B:B", 12)
+        moves_sheet.set_column("C:C", 20)
+        moves_sheet.set_column("D:D", 24)
+        moves_sheet.set_column("E:E", 14, money_format)
+        moves_sheet.set_column("F:F", 14)
+        moves_sheet.set_column("G:G", 18, money_format)
+        moves_sheet.set_column("H:H", 36)
+        moves_sheet.freeze_panes(1, 0)
+        moves_sheet.autofilter(0, 0, max(len(export_df), 1), len(export_df.columns) - 1)
+
+    excel_data = excel_buffer.getvalue()
+
+    left, right = st.columns(2)
+    with left:
+        st.download_button(
+            label="Descargar registros en CSV",
+            data=csv_data,
+            file_name="victorin_registros.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
+    with right:
+        st.download_button(
+            label="Descargar reporte en Excel",
+            data=excel_data,
+            file_name="victorin_reporte.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+        )
+
     st.dataframe(export_df, use_container_width=True, hide_index=True)
 
 
@@ -408,7 +475,7 @@ def main() -> None:
             render_loan_manager(client, loan_df, refresh_token)
 
     with tabs[3]:
-        render_export(capital_df, loan_df)
+        render_export(capital_df, loan_df, metrics)
 
     st.markdown("---")
     st.caption("La suma de Capital inicial + Ingreso 15 + Ingreso 30 determina el capital total; luego se descuenta el total prestado para obtener el saldo disponible.")
