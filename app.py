@@ -478,7 +478,7 @@ def main() -> None:
         render_export(capital_df, loan_df, metrics)
 
     st.markdown("---")
-    st.caption("La suma de Capital inicial + Ingreso 15 + Ingreso 30 determina el capital total; luego se descuenta el total prestado para obtener el saldo disponible.")
+    st.caption("¿Cómo me fue? ¿Cómo me está yendo?")
 
 
 if __name__ == "__main__":
